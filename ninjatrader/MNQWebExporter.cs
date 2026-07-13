@@ -51,7 +51,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 				DisplayInDataBox = false;
 
 				LocalPort = 8077;
-				CloudEndpoint = "https://YOUR-DEPLOYMENT.vercel.app/api/bars";
+				CloudEndpoint = "https://mnq0926-dashboard-acenasirs-projects.vercel.app/api/bars";
 				SecretToken = "change-me-mnq0926";
 				CloudPushSeconds = 30;
 				BarsToSend = 1500;

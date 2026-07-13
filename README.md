@@ -1,5 +1,13 @@
 # MNQ 09-26 Strategy Dashboard
 
+**Live site:** https://mnq0926-dashboard-acenasirs-projects.vercel.app
+
+> First-time setup: in the Vercel dashboard open the project → **Settings →
+> Deployment Protection → Vercel Authentication → Disabled**. New Vercel
+> projects are login-protected by default; until you disable it, only your
+> Vercel account can view the site and the NinjaTrader exporter's pushes to
+> `/api/bars` are rejected.
+
 A TradingView-style charting website for the **Micro E-mini Nasdaq-100 September 2026**
 futures contract (MNQ 09-26), fed by your own NinjaTrader/Apex real-time data.
 It overlays **ORB** (Opening Range Breakout), **FVG** (Fair Value Gaps) and
