@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MNQ 09-26 — Strategy Chart</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div id="app">
+
+  <header id="topbar">
+    <div class="brand">
+      <span class="sym">MNQ&nbsp;09-26</span>
+      <span class="desc">Micro E-mini Nasdaq-100 · Sep 2026 · CME</span>
+    </div>
+    <div class="quote">
+      <span id="last-price">—</span>
+      <span id="price-change" class="flat">—</span>
+    </div>
+    <div class="statuses">
+      <span id="market-status" class="badge">…</span>
+      <span id="feed-status" class="badge">connecting…</span>
+      <span id="freshness" class="badge subtle">—</span>
+    </div>
+  </header>
+
+  <div id="sim-banner" class="hidden">
+    SIMULATED DATA — NinjaTrader feed not detected. Showing generated replay so you can explore the tools.
+    Install the exporter (see README) for live Apex data.
+  </div>
+
+  <div id="controls">
+    <label>Interval
+      <select id="interval-select">
+        <option value="1">1 min</option>
+        <option value="5">5 min</option>
+        <option value="10" selected>10 min</option>
+        <option value="15">15 min</option>
+      </select>
+    </label>
+    <label>Opening range
+      <select id="orb-select">
+        <option value="5">5 min</option>
+        <option value="15" selected>15 min</option>
+        <option value="30">30 min</option>
+      </select>
+    </label>
+    <label class="chk"><input type="checkbox" id="toggle-orb" checked> ORB</label>
+    <label class="chk"><input type="checkbox" id="toggle-fvg" checked> FVG</label>
+    <label class="chk"><input type="checkbox" id="toggle-eng" checked> Engulfing</label>
+    <span class="hint">Click any candle to learn how to read it.</span>
+  </div>
+
+  <main id="layout">
+    <section id="chart-wrap">
+      <div id="chart"></div>
+      <canvas id="overlay"></canvas>
+      <div id="candle-tip" class="hidden"></div>
+    </section>
+
+    <aside id="panel">
+      <div id="bias-card">
+        <div id="bias-verdict" class="neutral">NEUTRAL — WAIT</div>
+        <div id="bias-confidence"></div>
+        <ul id="bias-reasons"></ul>
+      </div>
+
+      <div class="card" id="anatomy-card">
+        <h3>Reading the selected candle</h3>
+        <div id="anatomy-body" class="muted">Click a candle on the chart. I'll break down its body,
+        wicks and close location, and what each part says about buyers vs sellers.</div>
+      </div>
+
+      <div class="card">
+        <h3>The three tools on this chart</h3>
+        <details open>
+          <summary>ORB — Opening Range Breakout</summary>
+          <p>The high/low of the first minutes after the 9:30 AM ET equities open (shaded band).
+          A candle <em>closing</em> above the range high signals buyers won the opening auction
+          (long bias); a close below the low signals sellers (short bias). A poke beyond that
+          closes back inside is a <em>failed breakout</em> — often a trap that fuels the other direction.</p>
+        </details>
+        <details>
+          <summary>FVG — Fair Value Gap</summary>
+          <p>A 3-candle imbalance: when candle&nbsp;3's low is above candle&nbsp;1's high (or the mirror
+          on the way down), price moved so fast it left untraded prices — the shaded box. Price tends
+          to revisit ("fill") these gaps; an unfilled gap below price acts like support (buyers left
+          unfinished business), one above acts like resistance.</p>
+        </details>
+        <details>
+          <summary>Engulfing candles (the researched 3rd tool)</summary>
+          <p>Chosen over pin bars and momentum candles because it is the most objective one-bar shift
+          signal: today's body completely covers the previous body in the opposite direction, meaning
+          one side absorbed the other's entire move. With above-average volume it marks real
+          participation, not noise. Shown as ▲/▼ markers.</p>
+        </details>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <span>Green = bullish close · Blue = bearish close. Educational tool — not financial advice.</span>
+  </footer>
+</div>
+
+<script src="/assets/vendor/lightweight-charts.standalone.production.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>
