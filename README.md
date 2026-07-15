@@ -1,6 +1,6 @@
 # MNQ 09-26 Strategy Dashboard
 
-**Live site:** https://mnq0926-dashboard-acenasirs-projects.vercel.app
+**Live site:** https://mnq0926-dashboard.vercel.app
 
 > First-time setup: in the Vercel dashboard open the project → **Settings →
 > Deployment Protection → Vercel Authentication → Disabled**. New Vercel
