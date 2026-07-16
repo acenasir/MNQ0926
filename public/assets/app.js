@@ -34,6 +34,7 @@
     interval: 10,
     orbMinutes: 15,
     show: { orb: true, fvg: true, eng: true },
+    alertsOn: false,
     displayed: [],       // aggregated bars currently on chart
     analysis: null,      // last strategy run
     localFails: 0,
@@ -485,6 +486,61 @@
       <ul>${lessons.map((l) => `<li>${l}</li>`).join("")}</ul>`;
   }
 
+  // ---------- verdict-change alerts ----------
+  // Armed via the 🔔 checkbox; fires ONLY on live/cloud data, never on the
+  // simulated replay (those verdicts are random and must not drive trades).
+
+  let prevVerdict = null, lastAlertAt = 0, audioCtx = null, flashTimer = null;
+
+  function beep() {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const t0 = audioCtx.currentTime;
+      for (const [freq, delay] of [[880, 0], [660, 0.18], [880, 0.36]]) {
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.frequency.value = freq; o.connect(g); g.connect(audioCtx.destination);
+        g.gain.setValueAtTime(0.001, t0 + delay);
+        g.gain.exponentialRampToValueAtTime(0.3, t0 + delay + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, t0 + delay + 0.16);
+        o.start(t0 + delay); o.stop(t0 + delay + 0.2);
+      }
+    } catch { /* audio unavailable */ }
+  }
+
+  function flashTitle(msg) {
+    const original = "MNQ 09-26 — Strategy Chart";
+    let on = false;
+    clearInterval(flashTimer);
+    flashTimer = setInterval(() => { document.title = (on = !on) ? msg : original; }, 900);
+    setTimeout(() => { clearInterval(flashTimer); document.title = original; }, 20000);
+    window.addEventListener("focus", () => { clearInterval(flashTimer); document.title = original; }, { once: true });
+  }
+
+  function maybeAlert() {
+    const a = state.analysis;
+    if (!a) return;
+    const v = a.verdict;
+    if (prevVerdict === null) { prevVerdict = v; return; }
+    if (v === prevVerdict) return;
+    const from = prevVerdict;
+    prevVerdict = v;
+    if (!state.alertsOn || state.source === "sim") return;
+    if (Date.now() - lastAlertAt < 20000) return; // don't machine-gun on oscillation
+    lastAlertAt = Date.now();
+    beep();
+    flashTitle("🔔 " + v);
+    const card = document.getElementById("bias-card");
+    card.classList.add("alerting");
+    setTimeout(() => card.classList.remove("alerting"), 6500);
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        new Notification("MNQ 09-26 bias changed", {
+          body: `${from} → ${v} · price ${fmt(a.price)} · ${etClock(Math.floor(Date.now() / 1000))}`,
+        });
+      } catch { /* notifications blocked */ }
+    }
+  }
+
   // ---------- bias panel ----------
 
   function renderPanel() {
@@ -680,6 +736,7 @@
       runAnalysis();
       renderChart(firstRender);
       renderPanel();
+      maybeAlert();
       firstRender = false;
     } else if (state.displayed.length && state.base1m.length) {
       const tail = aggregate(state.base1m.slice(-state.interval * 2), state.interval);
@@ -717,6 +774,14 @@
   document.getElementById("orb-select").addEventListener("change", (e) => {
     state.orbMinutes = +e.target.value;
     onData(true);
+  });
+  document.getElementById("toggle-alerts").addEventListener("change", (e) => {
+    state.alertsOn = e.target.checked;
+    if (state.alertsOn) {
+      prevVerdict = state.analysis ? state.analysis.verdict : null;
+      if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+      beep(); // user gesture unlocks audio + confirms sound works
+    }
   });
   for (const [id, key] of [["toggle-orb", "orb"], ["toggle-fvg", "fvg"], ["toggle-eng", "eng"]]) {
     document.getElementById(id).addEventListener("change", (e) => {

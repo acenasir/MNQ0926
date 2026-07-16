@@ -83,6 +83,8 @@ body {
 #bias-card {
   border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card);
 }
+#bias-card.alerting { animation: alertPulse 1s ease-in-out 6; }
+@keyframes alertPulse { 50% { box-shadow: 0 0 0 4px var(--warn); } }
 #bias-verdict {
   padding: 14px; text-align: center; font-size: 18px; font-weight: 800; letter-spacing: 1px;
 }
