@@ -47,6 +47,12 @@
         <option value="30">30 min</option>
       </select>
     </label>
+    <label>Session open
+      <select id="anchor-select">
+        <option value="510">8:30 ET (news)</option>
+        <option value="570" selected>9:30 ET (equities)</option>
+      </select>
+    </label>
     <label class="chk"><input type="checkbox" id="toggle-orb" checked> ORB</label>
     <label class="chk"><input type="checkbox" id="toggle-fvg" checked> FVG</label>
     <label class="chk"><input type="checkbox" id="toggle-eng" checked> Engulfing</label>
@@ -72,6 +78,21 @@
         <h3>Reading the selected candle</h3>
         <div id="anatomy-body" class="muted">Click a candle on the chart. I'll break down its body,
         wicks and close location, and what each part says about buyers vs sellers.</div>
+      </div>
+
+      <div class="card" id="backtest-card">
+        <h3>Backtest — setup scoreboard</h3>
+        <div id="backtest-body" class="muted">Waiting for data…</div>
+        <details>
+          <summary>How these scores are computed (plain English)</summary>
+          <p><em>ORB:</em> for each session in the loaded history, take the opening range at your
+          chosen session open. The first 1-minute close beyond it is the entry; the stop is the
+          other side of the range; the target is one range-width away; anything still open exits
+          at session end. <em>Engulfing:</em> enter on the signal candle's close, stop at the
+          pattern's extreme, exit after 6 bars if neither hits. Win % is how often the trade made
+          money; net points is the running total. Few trades = weak evidence — treat scores as
+          context, not proof.</p>
+        </details>
       </div>
 
       <div class="card">

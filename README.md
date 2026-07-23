@@ -85,6 +85,16 @@ npx vercel dev        # serves public/ + /api/bars on localhost:3000
   `engulf+vol` markers mean above-average participation.
 - **Bias panel** — combines all three into **BUYING RUN / SELLING RUN /
   NEUTRAL–WAIT** with the reasoning spelled out against the actual candles.
+- **Bias alerts (🔔)** — optional sound + tab flash + desktop notification when
+  the verdict changes. Arms only on LIVE/CLOUD data, never on simulated replay.
+- **Session open selector** — anchor the ORB to the 9:30 ET equities open or
+  the 8:30 ET economic-news open.
+- **Backtest scoreboard** — replays the loaded history through the ORB and
+  engulfing rules (entries, stops, targets spelled out in the UI) and scores
+  each setup with trade count, win rate, and net points. Scores computed on
+  simulated data are clearly flagged. Fully automated order execution is
+  deliberately out of scope: this tool has no broker connection, and prop-firm
+  rules (including Apex's) prohibit unattended automated trading.
 - **Candle school** — click any candle for a breakdown of its body, wicks, close
   location and volume, and what each says about buyers vs sellers.
 

@@ -33,6 +33,7 @@
     lastDataAt: 0,       // ms clock of last successful feed event
     interval: 10,
     orbMinutes: 15,
+    orbAnchor: 570,      // session open in ET minutes: 510 = 8:30 (news), 570 = 9:30 (equities)
     show: { orb: true, fvg: true, eng: true },
     alertsOn: false,
     displayed: [],       // aggregated bars currently on chart
@@ -84,15 +85,14 @@
     return { open: true, label: "MARKET OPEN" };
   }
 
-  // Most recent weekday 9:30 ET at or before `unix`, as unix seconds.
-  function latestSessionOpen(unix) {
+  // Most recent weekday session open (anchorMin minutes after ET midnight,
+  // e.g. 510 = 8:30, 570 = 9:30) at or before `unix`, as unix seconds.
+  function latestSessionOpen(unix, anchorMin) {
     for (let back = 0; back < 7; back++) {
       const dayRef = unix - back * 86400;
       const p = etParts(dayRef);
       if (p.wd === "Sat" || p.wd === "Sun") continue;
-      // walk to 9:30 ET of that ET calendar day
-      const ref = etParts(dayRef);
-      const deltaMin = (ref.h * 60 + ref.mi) - (9 * 60 + 30);
+      const deltaMin = (p.h * 60 + p.mi) - anchorMin;
       const open = dayRef - deltaMin * 60 - (dayRef % 60);
       if (open <= unix) return open;
     }
@@ -127,7 +127,7 @@
   function computeORB(bars1m, orbMinutes) {
     if (!bars1m.length) return null;
     const lastT = bars1m[bars1m.length - 1].t;
-    const open = latestSessionOpen(lastT);
+    const open = latestSessionOpen(lastT, state.orbAnchor);
     if (!open) return null;
     const end = open + orbMinutes * 60;
     const inRange = bars1m.filter((b) => b.t >= open && b.t < end);
@@ -216,6 +216,82 @@
       lowerPct: range > 0 ? lowerWick / range : 0,
       closeLoc,
     };
+  }
+
+  // ---------- backtester ----------
+  // Replays the loaded history through the setup rules and scores them.
+  // Deliberately simple, honest rules; small samples are labelled as such.
+
+  function tradeStats(trades) {
+    const wins = trades.filter((t) => t.pts > 0).length;
+    const net = trades.reduce((s, t) => s + t.pts, 0);
+    return {
+      n: trades.length,
+      winRate: trades.length ? wins / trades.length : 0,
+      net,
+      avg: trades.length ? net / trades.length : 0,
+    };
+  }
+
+  // ORB: first 1m close beyond the range; stop = far side of range;
+  // target = one range-width; otherwise exit at session end. One trade/session.
+  function backtestORB(bars1m, anchorMin, orbMinutes) {
+    const sessions = new Map();
+    for (const b of bars1m) {
+      const open = latestSessionOpen(b.t, anchorMin);
+      if (open == null || b.t >= open + 6.5 * 3600) continue;
+      if (!sessions.has(open)) sessions.set(open, []);
+      sessions.get(open).push(b);
+    }
+    const trades = [];
+    for (const [open, bars] of sessions) {
+      const end = open + orbMinutes * 60;
+      const inRange = bars.filter((b) => b.t >= open && b.t < end);
+      if (inRange.length < 3) continue; // range never properly formed in data
+      const hi = Math.max(...inRange.map((b) => b.h));
+      const lo = Math.min(...inRange.map((b) => b.l));
+      const range = hi - lo;
+      if (range <= 0) continue;
+      const after = bars.filter((b) => b.t >= end);
+      for (let i = 0; i < after.length; i++) {
+        const b = after[i];
+        const dir = b.c > hi ? 1 : b.c < lo ? -1 : 0;
+        if (!dir) continue;
+        const entry = b.c;
+        const stop = dir === 1 ? lo : hi;
+        const target = entry + dir * range;
+        let pts = null;
+        for (let j = i + 1; j < after.length; j++) {
+          const x = after[j];
+          if (dir === 1 ? x.l <= stop : x.h >= stop) { pts = dir * (stop - entry); break; }
+          if (dir === 1 ? x.h >= target : x.l <= target) { pts = dir * (target - entry); break; }
+        }
+        if (pts === null) pts = dir * (after[after.length - 1].c - entry);
+        trades.push({ t: b.t, dir, pts });
+        break; // first breakout per session only
+      }
+    }
+    return tradeStats(trades);
+  }
+
+  // Engulfing: enter on signal close, stop at pattern extreme, exit after 6 bars.
+  function backtestEngulfing(bars) {
+    const trades = [];
+    for (const m of computeEngulfing(bars)) {
+      const i = bars.findIndex((b) => b.t === m.t);
+      if (i < 0 || i + 1 >= bars.length) continue;
+      const dir = m.dir === "bull" ? 1 : -1;
+      const entry = bars[i].c;
+      const stop = dir === 1 ? bars[i].l : bars[i].h;
+      let pts = null;
+      for (let j = i + 1; j < Math.min(i + 7, bars.length); j++) {
+        const x = bars[j];
+        if (dir === 1 ? x.l <= stop : x.h >= stop) { pts = dir * (stop - entry); break; }
+      }
+      if (pts === null) pts = dir * (bars[Math.min(i + 6, bars.length - 1)].c - entry);
+      trades.push({ t: m.t, dir, pts });
+    }
+    return tradeStats(trades);
   }
 
   // ---------- bias engine ----------
@@ -312,7 +388,12 @@
     if (pros && cons) confidence = `Signals disagree (${pros} bullish vs ${cons} bearish) — score ${score >= 0 ? "+" : ""}${score}. Lower confidence; wait for alignment.`;
     else confidence = `Score ${score >= 0 ? "+" : ""}${score} · ${pros + cons} active signal${pros + cons === 1 ? "" : "s"}, all pointing the same way.`;
 
-    state.analysis = { orb, fvgs, engulfs, score, reasons, verdict, cls, confidence, price };
+    const backtest = {
+      orb: backtestORB(bars1m, state.orbAnchor, state.orbMinutes),
+      eng: backtestEngulfing(displayed),
+    };
+
+    state.analysis = { orb, fvgs, engulfs, score, reasons, verdict, cls, confidence, price, backtest };
   }
 
   const fmt = (p) => p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -561,6 +642,34 @@
     ul.innerHTML = a.reasons
       .map((r) => `<li class="${r.pro === true ? "pro" : r.pro === false ? "con" : ""}">${r.text}</li>`)
       .join("");
+    renderBacktest();
+  }
+
+  function renderBacktest() {
+    const el = document.getElementById("backtest-body");
+    const a = state.analysis;
+    if (!a || !a.backtest || !state.base1m.length) {
+      el.textContent = "Waiting for data…";
+      return;
+    }
+    const warn = state.source === "sim"
+      ? `<div class="bt-warn">⚠ Scores computed on SIMULATED data — use only to learn the mechanics.</div>` : "";
+    const hours = Math.round((state.base1m[state.base1m.length - 1].t - state.base1m[0].t) / 3600);
+    const anchorLabel = state.orbAnchor === 510 ? "8:30" : "9:30";
+    const row = (name, s) => {
+      const small = s.n > 0 && s.n < 10 ? " <span class=\"bt-small\">(small sample)</span>" : "";
+      return `<tr><td>${name}${small}</td><td>${s.n}</td>` +
+        `<td>${s.n ? Math.round(s.winRate * 100) + "%" : "—"}</td>` +
+        `<td class="${s.net >= 0 ? "pos" : "neg"}">${s.n ? (s.net >= 0 ? "+" : "") + s.net.toFixed(2) : "—"}</td>` +
+        `<td>${s.n ? (s.avg >= 0 ? "+" : "") + s.avg.toFixed(2) : "—"}</td></tr>`;
+    };
+    el.innerHTML = `${warn}
+      <table class="bt"><thead><tr><th>Setup</th><th>Trades</th><th>Win</th><th>Net pts</th><th>Avg</th></tr></thead>
+      <tbody>
+        ${row(`ORB ${anchorLabel} + ${state.orbMinutes}m`, a.backtest.orb)}
+        ${row(`Engulfing (${state.interval}m)`, a.backtest.eng)}
+      </tbody></table>
+      <div class="bt-note">Replayed over the loaded ${hours}h of history. More history = more trustworthy scores.</div>`;
   }
 
   function renderHeader() {
@@ -773,6 +882,10 @@
   });
   document.getElementById("orb-select").addEventListener("change", (e) => {
     state.orbMinutes = +e.target.value;
+    onData(true);
+  });
+  document.getElementById("anchor-select").addEventListener("change", (e) => {
+    state.orbAnchor = +e.target.value;
     onData(true);
   });
   document.getElementById("toggle-alerts").addEventListener("change", (e) => {
