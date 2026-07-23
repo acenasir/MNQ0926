@@ -683,7 +683,7 @@
         : null;
       const ref = dayOpen ? dayOpen.o : state.displayed[0].o;
       const chg = p - ref;
-      chgEl.textContent = `${chg >= 0 ? "+" : ""}${fmt(chg)} (${((chg / ref) * 100).toFixed(2)}%) since 9:30 ET`;
+      chgEl.textContent = `${chg >= 0 ? "+" : ""}${fmt(chg)} (${((chg / ref) * 100).toFixed(2)}%) since session open`;
       chgEl.className = chg > 0 ? "up" : chg < 0 ? "down" : "flat";
     }
 
